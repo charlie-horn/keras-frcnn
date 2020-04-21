@@ -30,10 +30,11 @@ parser.add_option("--vf", dest="vertical_flips", help="Augment with vertical fli
 parser.add_option("--rot", "--rot_90", dest="rot_90", help="Augment with 90 degree rotations in training. (Default=false).",
 				  action="store_true", default=False)
 parser.add_option("--num_epochs", type="int", dest="num_epochs", help="Number of epochs.", default=2000)
+parser.add_option("--epoch_length", type="int", dest="epoch_length", help="Length of epochs.", default=1000)
 parser.add_option("--config_filename", dest="config_filename", help=
 				"Location to store all the metadata related to the training (to be used when testing).",
 				default="config.pickle")
-parser.add_option("--output_weight_path", dest="output_weight_path", help="Output path for weights.", default='./model_frcnn.hdf5')
+#parser.add_option("--output_weight_path", dest="output_weight_path", help="Output path for weights.", default="./weights/model_frcnn.hdf5")
 parser.add_option("--input_weight_path", dest="input_weight_path", help="Input path for weights. If not specified, will try to load default weights provided by keras.")
 
 (options, args) = parser.parse_args()
@@ -45,6 +46,8 @@ if options.parser == 'pascal_voc':
 	from keras_frcnn.pascal_voc_parser import get_data
 elif options.parser == 'simple':
 	from keras_frcnn.simple_parser import get_data
+elif options.parser == 'waymo':
+	from keras_frcnn.waymo_parser import get_data
 else:
 	raise ValueError("Command line option parser must be one of 'pascal_voc' or 'simple'")
 
@@ -55,7 +58,12 @@ C.use_horizontal_flips = bool(options.horizontal_flips)
 C.use_vertical_flips = bool(options.vertical_flips)
 C.rot_90 = bool(options.rot_90)
 
-C.model_path = options.output_weight_path
+parser_name = options.parser
+num_rois = options.num_rois
+network = options.network
+num_epochs = options.num_epochs
+epoch_length = options.epoch_length
+C.model_path = "./weights/{}_{}_{}_{}_{}.hdf5".format(parser_name, num_rois, network, num_epochs, epoch_length)
 C.num_rois = int(options.num_rois)
 
 if options.network == 'vgg':
@@ -97,6 +105,7 @@ with open(config_output_filename, 'wb') as config_f:
 	print('Config has been written to {}, and can be loaded when testing to ensure correct results'.format(config_output_filename))
 
 random.shuffle(all_imgs)
+#pprint.pprint(all_imgs[0])
 
 num_imgs = len(all_imgs)
 
@@ -105,12 +114,11 @@ val_imgs = [s for s in all_imgs if s['imageset'] == 'test']
 
 print('Num train samples {}'.format(len(train_imgs)))
 print('Num val samples {}'.format(len(val_imgs)))
+#print(len(train_imgs), len(train_imgs[0]), len(train_imgs[0][0]), len(train_imgs[0][0][0]))
+data_gen_train = data_generators.get_anchor_gt(train_imgs, classes_count, C, nn.get_img_output_length, K.image_data_format(), mode='train')
+data_gen_val = data_generators.get_anchor_gt(val_imgs, classes_count, C, nn.get_img_output_length,K.image_data_format(), mode='val')
 
-
-data_gen_train = data_generators.get_anchor_gt(train_imgs, classes_count, C, nn.get_img_output_length, K.image_dim_ordering(), mode='train')
-data_gen_val = data_generators.get_anchor_gt(val_imgs, classes_count, C, nn.get_img_output_length,K.image_dim_ordering(), mode='val')
-
-if K.image_dim_ordering() == 'th':
+if K.image_data_format() == 'channels_first':
 	input_shape_img = (3, None, None)
 else:
 	input_shape_img = (None, None, 3)
@@ -147,7 +155,7 @@ model_rpn.compile(optimizer=optimizer, loss=[losses.rpn_loss_cls(num_anchors), l
 model_classifier.compile(optimizer=optimizer_classifier, loss=[losses.class_loss_cls, losses.class_loss_regr(len(classes_count)-1)], metrics={'dense_class_{}'.format(len(classes_count)): 'accuracy'})
 model_all.compile(optimizer='sgd', loss='mae')
 
-epoch_length = 1000
+epoch_length = int(options.epoch_length)
 num_epochs = int(options.num_epochs)
 iter_num = 0
 
@@ -184,7 +192,7 @@ for epoch_num in range(num_epochs):
 
 			P_rpn = model_rpn.predict_on_batch(X)
 
-			R = roi_helpers.rpn_to_roi(P_rpn[0], P_rpn[1], C, K.image_dim_ordering(), use_regr=True, overlap_thresh=0.7, max_boxes=300)
+			R = roi_helpers.rpn_to_roi(P_rpn[0], P_rpn[1], C, K.image_data_format(), use_regr=True, overlap_thresh=0.7, max_boxes=300)
 			# note: calc_iou converts from (x1,y1,x2,y2) to (x,y,w,h) format
 			X2, Y1, Y2, IouS = roi_helpers.calc_iou(R, img_data, C, class_mapping)
 
@@ -239,7 +247,7 @@ for epoch_num in range(num_epochs):
 			losses[iter_num, 4] = loss_class[3]
 
 			progbar.update(iter_num+1, [('rpn_cls', losses[iter_num, 0]), ('rpn_regr', losses[iter_num, 1]),
-									  ('detector_cls', losses[iter_num, 2]), ('detector_regr', losses[iter_num, 3])])
+										('detector_cls', losses[iter_num, 2]), ('detector_regr', losses[iter_num, 3])])
 
 			iter_num += 1
 			
