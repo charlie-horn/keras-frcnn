@@ -2,6 +2,7 @@ import os
 import cv2
 import xml.etree.ElementTree as ET
 import numpy as np
+
 def get_data(input_path):
 	all_imgs = []
 
@@ -9,7 +10,7 @@ def get_data(input_path):
 
 	class_mapping = {}
 
-	visualise = True
+	visualise = False
 
 	data_paths = [os.path.join(input_path,s) for s in ['VOC2012']]
 	
