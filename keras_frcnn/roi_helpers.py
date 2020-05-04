@@ -26,18 +26,21 @@ def calc_iou(R, img_data, C, class_mapping):
 	y_class_regr_coords = []
 	y_class_regr_label = []
 	IoUs = [] # for debugging only
-
+	print("Number of proposed regions:", len(R.shape[0]))
 	for ix in range(R.shape[0]):
 		(x1, y1, x2, y2) = R[ix, :]
 		x1 = int(round(x1))
 		y1 = int(round(y1))
 		x2 = int(round(x2))
 		y2 = int(round(y2))
+		print("Proposed region for comparison:",x1,x2,y1,y2)
 
 		best_iou = 0.0
 		best_bbox = -1
 		for bbox_num in range(len(bboxes)):
+			print("Box to compare:",gta[bbox_num, 0], gta[bbox_num, 2], gta[bbox_num, 1], gta[bbox_num, 3])
 			curr_iou = data_generators.iou([gta[bbox_num, 0], gta[bbox_num, 2], gta[bbox_num, 1], gta[bbox_num, 3]], [x1, y1, x2, y2])
+			print("IoU:", curr_iou)
 			if curr_iou > best_iou:
 				best_iou = curr_iou
 				best_bbox = bbox_num
