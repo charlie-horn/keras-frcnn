@@ -26,7 +26,7 @@ def calc_iou(R, img_data, C, class_mapping):
 	y_class_regr_coords = []
 	y_class_regr_label = []
 	IoUs = [] # for debugging only
-	print("Number of proposed regions:", len(R.shape[0]))
+	print("Number of proposed regions:", R.shape[0])
 	for ix in range(R.shape[0]):
 		(x1, y1, x2, y2) = R[ix, :]
 		x1 = int(round(x1))
